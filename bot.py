@@ -42,23 +42,11 @@ load_dotenv()
 
 api_id = int(cast(str, os.getenv("API_ID")))
 api_hash = cast(str, os.getenv("API_HASH"))
+session_string = cast(str, os.getenv("SESSION_STRING"))
 
-app = Client("my_bot", api_id=api_id, api_hash=api_hash)
-
-
-@app.on_message(group=-1)  # type: ignore
-async def join_minroob(_: Client, message: Message):
-    if not message.via_bot:
-        return
-
-    if not (message.via_bot.username and message.via_bot.username == "minroobot"):
-        return
-
-    try:
-        await message.click()
-        await message.reply_text("I'm here!")
-    except TimeoutError:
-        await message.reply_text("I may be here or not.")
+app = Client(
+    ":memory:", api_id=api_id, api_hash=api_hash, session_string=session_string
+)
 
 
 async def play_async(_: Client, message: Message):
@@ -105,6 +93,21 @@ async def play_async(_: Client, message: Message):
         await message.click(selected.position.y, selected.position.x)
 
 
+@app.on_message(group=-1)  # type: ignore
+async def join_minroob(_: Client, message: Message):
+    if not message.via_bot:
+        return
+
+    if not (message.via_bot.username and message.via_bot.username == "minroobot"):
+        return
+
+    try:
+        await message.click()
+        await message.reply_text("I'm here!")
+    except TimeoutError:
+        await message.reply_text("I may be here or not.")
+
+
 @app.on_edited_message()  # type: ignore
 async def minroob_started(client: Client, message: Message):
     await play_async(client, message)
@@ -116,6 +119,12 @@ async def minroob_play_force(client: Client, message: Message):
         return
 
     await play_async(client, message.reply_to_message)
+
+
+@app.on_message(command("ss") & private)  # type: ignore
+async def minroob_ss(client: Client, message: Message):
+    ss = await client.export_session_string()
+    await message.reply_text(ss)
 
 
 app.run()
