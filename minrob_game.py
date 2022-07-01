@@ -1,6 +1,7 @@
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Generator
+from typing import Generator, Generic, TypeVar
 
 from pyrogram.types import InlineKeyboardButton, User
 
@@ -24,6 +25,7 @@ class Position:
     y: int
 
 
+INITIAL_SUCCESS_RATIO = 0.005
 CUSTOM_SUCCESS_RATIO: dict[tuple[int, int], float] = {
     (1, 1): 0.02,
     (1, 5): 0.02,
@@ -40,18 +42,18 @@ class Block:
     def __init__(self, position: Position, reval_info: RevalInfo) -> None:
         self.position = position
         self.reval_info = reval_info
-        self._success_ratios = [
-            CUSTOM_SUCCESS_RATIO.get((position.x, position.y), 0.001)
-        ]
+        self._success_ratios: set[float] = {
+            CUSTOM_SUCCESS_RATIO.get((position.x, position.y), INITIAL_SUCCESS_RATIO)
+        }
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.position})"
 
-    def set_success_ratio(self, ratio: float):
+    def add_success_ratio(self, ratio: float):
         if ratio < 0.0 or ratio > 1.0:
             raise ValueError("ratio must be between 0.0 and 1.0")
 
-        self._success_ratios.append(ratio)
+        self._success_ratios.add(ratio)
 
     @property
     def success_ratio(self) -> float:
@@ -113,6 +115,23 @@ class EmptyBlock(RevealedBlock):
 
     def __repr__(self) -> str:
         return f"EmptyBlock({self.position})"
+
+
+_TBlock = TypeVar("_TBlock", bound=Block)
+
+
+class AbstractRatioCalculator(Generic[_TBlock]):
+    def __init__(self, block_type: type[_TBlock]) -> None:
+        self._block_type = block_type
+
+    def calculate(self, current_block: Block, surrounding_blocks: list[Block]):
+        if not isinstance(current_block, self._block_type):
+            return
+        self.__calculate__(current_block, surrounding_blocks)
+
+    @abstractmethod
+    def __calculate__(self, current_block: Block, surrounding_blocks: list[Block]):
+        ...
 
 
 class MinroobGame:
@@ -177,7 +196,7 @@ class MinroobGame:
             ratio = 0.0
         for block in surrounding_blocks:
             if not block.reval_info.revealed:
-                block.set_success_ratio(ratio)
+                block.add_success_ratio(ratio)
 
     def calculate_all_success_ratios(self):
         for row in self._blocks:
