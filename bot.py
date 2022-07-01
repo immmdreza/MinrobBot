@@ -44,6 +44,7 @@ async def play_async(_: Client, message: Message):
 
     if any(any(button.text == "💣" for button in row) for row in buttons):
         await message.reply_text("Game is ended!")
+        del games[message.id]
         return
 
     game.decide_my_turn(
@@ -63,7 +64,10 @@ async def play_async(_: Client, message: Message):
             "with success ratios",
             ", ".join(str(x) for x in selected._success_ratios),
         )
-        await message.click(selected.position.y, selected.position.x)
+        try:
+            await message.click(selected.position.y, selected.position.x)
+        except TimeoutError:
+            pass
 
 
 @app.on_message(group=-1)  # type: ignore
