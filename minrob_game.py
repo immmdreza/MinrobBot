@@ -1,8 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Generator
 
-from pyrogram.types import InlineKeyboardButton
+from pyrogram.types import InlineKeyboardButton, User
 
 
 class Player(Enum):
@@ -86,7 +86,6 @@ class RevealedBlock(Block):
         )
 
 
-@dataclass(repr=True)
 class MineBlock(RevealedBlock):
     def __init__(self, position: Position, revealed_by: Player | None = None) -> None:
         self.reval_info = RevalInfo(
@@ -95,7 +94,6 @@ class MineBlock(RevealedBlock):
         super().__init__(position, revealed_by)
 
 
-@dataclass(repr=True)
 class NumericBlock(RevealedBlock):
     def __init__(self, position: Position, number: int) -> None:
         self.reval_info = RevalInfo(
@@ -105,7 +103,6 @@ class NumericBlock(RevealedBlock):
         super().__init__(position, None)
 
 
-@dataclass(repr=True)
 class EmptyBlock(RevealedBlock):
     def __init__(self, position: Position) -> None:
         self.reval_info = RevalInfo(
@@ -118,22 +115,6 @@ class EmptyBlock(RevealedBlock):
         return f"EmptyBlock({self.position})"
 
 
-# x For Blue
-# o For Red
-# . For Empty
-# * For Mine
-# ? For UnRevealed
-# - For impossible
-# ---------------------------
-# [?] [?] [?] [?] [?] [?] [?]
-# [?] [?] [?] [?] [?] [?] [?]
-# [?] [?] [?] [1] [-] [o] [?]
-# [?] [?] [?] [-] [1] [-] [?]
-# [?] [?] [?] [-] [-] [-] [?]
-# [?] [?] [?] [?] [?] [?] [?]
-# [?] [?] [?] [?] [?] [?] [?]
-# [?] [?] [?] [?] [?] [?] [?]
-# ---------------------------
 class MinroobGame:
     def __init__(self) -> None:
         self._reminded_mins = 15
@@ -142,9 +123,6 @@ class MinroobGame:
             self._blocks.append([])
             for y in range(7):
                 self._blocks[-1].append(UnRevealedBlock(Position(x, y)))
-
-    def reorder_blocks(self, new: list[list[Block]]):
-        self._blocks = new
 
     def reorder_blocks_from_buttons(self, buttons: list[list[InlineKeyboardButton]]):
         self._blocks = [
@@ -157,7 +135,6 @@ class MinroobGame:
 
     @staticmethod
     def button_text_to_block(button_text: str, position: Position) -> Block:
-        "💣"
         match button_text:
             case "🔵️":
                 return MineBlock(position=position, revealed_by=Player.Blue)
@@ -194,10 +171,9 @@ class MinroobGame:
             if not block.reval_info.revealed:
                 unrevealed_around += 1
 
-        #                4                     5
-        if unrevealed_around != 0:
+        try:
             ratio = (current_block.number - mines_block) / unrevealed_around
-        else:
+        except ZeroDivisionError:
             ratio = 0.0
         for block in surrounding_blocks:
             if not block.reval_info.revealed:
@@ -225,3 +201,26 @@ class MinroobGame:
                 reverse=True,
             )
         )
+
+
+@dataclass
+class GameInfo:
+    me: User
+    game: MinroobGame = field(default_factory=MinroobGame)
+    my_color: str | None = None
+    turn_decided: bool = False
+    my_turn: bool = False
+
+    def decide_my_turn(self, first_name: str, turns_row: list[InlineKeyboardButton]):
+        my_turn = False
+        last_line_texts = [b.text for b in turns_row]
+        for user_text in last_line_texts:
+            if user_text.startswith("🎮"):
+                if self.my_color is None:
+                    if user_text.endswith(first_name):
+                        my_turn = True
+                        self.my_color = user_text[1]
+                else:
+                    my_turn = user_text.startswith("🎮" + self.my_color)
+        self.my_turn = my_turn
+        self.turn_decided = True

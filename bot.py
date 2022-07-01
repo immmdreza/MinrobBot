@@ -1,40 +1,13 @@
-import os
 import asyncio
-from dataclasses import dataclass, field
+import os
 from typing import cast
 
 from dotenv import load_dotenv
 from pyrogram.client import Client
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, User
 from pyrogram.filters import command, private, reply
+from pyrogram.types import InlineKeyboardMarkup, Message
 
-from minrob_game import MinroobGame
-
-
-@dataclass
-class GameInfo:
-    me: User
-    game: MinroobGame = field(default_factory=MinroobGame)
-    my_color: str | None = None
-    turn_decided: bool = False
-    my_turn: bool = False
-
-    def decide_my_turn(self, first_name: str, turns_row: list[InlineKeyboardButton]):
-        my_turn = False
-        last_line_texts = [b.text for b in turns_row]
-        for user_text in last_line_texts:
-            if user_text.startswith("🎮"):
-                if self.my_color is None:
-                    if user_text.endswith(first_name):
-                        my_turn = True
-                        self.my_color = user_text[1]
-                else:
-                    my_turn = user_text.startswith("🎮" + self.my_color)
-        self.my_turn = my_turn
-        self.turn_decided = True
-
-    def switch_turn(self):
-        self.my_turn = not self.my_turn
+from minrob_game import GameInfo
 
 
 games: dict[int, GameInfo] = {}
